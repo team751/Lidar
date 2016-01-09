@@ -1,0 +1,62 @@
+#include <roborio_connection.h>
+
+#include <iomanip>
+#include <sstream>
+#include <string>
+
+#include <serial/serial.h>
+
+#include <lidar_data_processor.h>
+#include <lidar_serial_data_collector.h>
+
+std::string ZeroPadNumber(int num)
+{
+    std::ostringstream ss;
+    ss << std::setw( 3) << std::setfill( '0' ) << num;
+    return ss.str();
+}
+
+int mainSegFaultTest(int argc, char **argv) {
+	RoboRIOConnection connection;
+	connection.start("10.7.51.2", "8001");
+
+	LidarSerialDataCollector lidarSerialDataCollector("/dev/cu.usbserial-A903IUON", 115200);
+	lidarSerialDataCollector.start();
+	
+  return 0;
+}
+
+int main(int argc, char **argv) {
+    RoboRIOConnection connection;
+    connection.start("10.7.51.2", "8001");
+//     connection.send(TotePose(TotePose::ToteEndpoint(4, 3), TotePose::ToteEndpoint(10, 3), 50));
+//
+//    while (true) {
+//        connection.send(TotePose(TotePose::ToteEndpoint(4, 3), TotePose::ToteEndpoint(10, 3), 50));
+//    }
+
+    LidarSerialDataCollector lidarSerialDataCollector("/dev/cu.usbserial-A903IUON", 115200);
+    lidarSerialDataCollector.start();
+
+    LidarDataProcessor dataProcessor;
+
+    // Setup Serial Port
+    serial::Serial lidarSpeedController("/dev/tty.wchusbserial1410", 9600, serial::Timeout::simpleTimeout(1000));
+
+    while (lidarSerialDataCollector.isRunning()) {
+        lidarSpeedController.write("a200");
+        std::cout << lidarSpeedController.read(3) << std::endl;
+        if (lidarSerialDataCollector.serialPacket != NULL) {
+            // std::cout <<  ZeroPadNumber((int)lidarSerialDataCollector.serialPacket->getSpeed()) << std::endl;
+            lidarSpeedController.write("a" +  ZeroPadNumber((int)lidarSerialDataCollector.serialPacket->getSpeed()));
+            std::cout << lidarSpeedController.read(3) << std::endl;
+        } else {
+            lidarSpeedController.write("a" + ZeroPadNumber((int)0));
+        }
+            connection.send(dataProcessor.processLidarData(lidarSerialDataCollector.getOutput()));
+    }
+
+    connection.stop();
+
+    return 0;
+}
